@@ -14,7 +14,10 @@
   }
 
   function tokenize(text) {
-    return String(text).replace(/[\u200c\u200d]/g, '').split(/[\s,;|\/\u0964]+/)
+    return String(text).replace(/[\u200c\u200d]/g, '')
+      .replace(/(?:\u20B9|\brs\.?)\s*(\d[\d.]*)/gi, ' rs $1 ')
+      .replace(/(\d)\s*(?:\u20B9|rs\b\.?|rupees?\b|rupais?\b|rubais?\b|\u0BB0\u0BC2\u0BAA\u0BBE\u0BAF\u0BCD(?:\u0B95\u0BCD\u0B95\u0BC1)?)/gi, '$1 rs ')
+      .replace(/\u20B9/g, ' rs ').split(/[\s,;|\/\u0964]+/)
       .map(function (t) { return t.replace(/^[.:!?"'()]+|[.:!?"'()]+$/g, ''); })
       .filter(Boolean);
   }
@@ -39,6 +42,16 @@
    [8, 'ettu eight எட்டு'],
    [9, 'onbadhu ombodhu nine ஒன்பது'],
    [10, 'pathu ten பத்து'],
+   [11, 'pathinonu'],
+   [15, 'pathinainthu pathinanju'],
+   [20, 'irubathu irupathu twenty இருபது'],
+   [30, 'muppathu thirty முப்பது'],
+   [40, 'naarpathu nalupathu forty நாற்பது'],
+   [50, 'aimbathu ainpathu fifty ஐம்பது'],
+   [60, 'arubathu aruvathu sixty அறுபது'],
+   [70, 'ezhubathu seventy எழுபது'],
+   [80, 'enbathu eighty எண்பது'],
+   [90, 'thonnooru ninety தொண்ணூறு'],
    [12, 'pannirandu panniranda twelve'],
    [100, 'nooru hundred நூறு'],
    [200, 'irunooru இருநூறு'],
@@ -62,6 +75,11 @@
     pc: 'packet pocket pkt pc pcs piece pieces nos number பாக்கெட் எண்ணம்',
     dozen: 'dozen டஜன்'
   });
+  // rupee words. A number next to one of these is an AMOUNT in rupees, never a weight.
+  var CURRENCY = {};
+  ('rs rupee rupees rupai rupais rupay rubai rubais rubay ruba rupa rupaa rubaa rupaiku rubaiku rupayku ' +
+   'ரூபாய் ரூபா ரூ ருபாய் ரூபாய்க்கு ரூபாக்கு').split(' ').forEach(function (w) { CURRENCY[skeleton(w)] = 1; });
+  function isCur(t) { return CURRENCY[skeleton(t)] === 1; }
   var FILLER = {};
   ('pannu podu podunga poduga add venum venumnu vendum kodunga kudunga thanga thaanga tharunga mattrum matrum and um ku ' +
    'aprom apram appuram next then also vera inum innum pls please anna bro sir boss ' +
@@ -75,6 +93,11 @@
   // returns {value, unit|null, used, explicit} or null. value is in the written unit.
   function readQty(tokens, i) {
     var t = tokens[i], sk = skeleton(t), m;
+    // "rs 5" / "rupees 5": currency word first, then a plain number
+    if (isCur(t) && i + 1 < tokens.length) {
+      var nx = tokens[i + 1], nv = isNumeric(nx) ? parseFloat(nx) : NUM[skeleton(nx)];
+      if (nv !== undefined && !(i + 2 < tokens.length && UNIT[skeleton(tokens[i + 2])])) return { amount: nv, unit: null, used: 2 };
+    }
     if ((m = ATTACHED.exec(t))) {
       return { value: parseFloat(m[1]), unit: unitOf(m[2]), used: 1 };
     }
@@ -86,6 +109,11 @@
     // number followed by fraction: "rendu arai kilo" = 2.5 ; "oru kaal" is not 1.25
     if (j < tokens.length && FRACTION[skeleton(tokens[j])] !== undefined && NUM[sk] !== undefined && NUM[sk] < 10 && FRACTION[sk] === undefined) {
       value += FRACTION[skeleton(tokens[j])]; used++; j++;
+    }
+    // "5 rubai" / "anju rupees": a rupee AMOUNT. Fractions are not accepted as amounts.
+    if (j < tokens.length && isCur(tokens[j])) {
+      if (FRACTION[sk] !== undefined || used > 1) return { amount: null, bad: true, value: value, unit: null, used: used + 1 };
+      return { amount: value, unit: null, used: used + 1 };
     }
     var unit = null;
     if (j < tokens.length && UNIT[skeleton(tokens[j])]) { unit = UNIT[skeleton(tokens[j])]; used++; }
@@ -171,6 +199,7 @@
         ev.push({ k: 'item', ids: mi.ids, text: tokens.slice(i, i + mi.used).join(' '), exact: true }); i += mi.used; continue;
       }
       if (q) { ev.push({ k: 'qty', q: q, text: tokens.slice(i, i + q.used).join(' ') }); i += q.used; continue; }
+      if (isCur(t)) { ev.push({ k: 'cur', text: t }); i++; continue; }
       if (mi) { ev.push({ k: 'item', ids: mi.ids, text: tokens.slice(i, i + mi.used).join(' '), exact: false }); i += mi.used; continue; }
       if (UNIT[sk]) {
         // unit alone ("kilo") with no number: treat as 1 unit
@@ -188,7 +217,7 @@
     for (p = 0; p < ev.length; p++) {
       if (used[p]) continue;
       var e = ev[p];
-      if (e.k === 'qty') continue; // consumed by an item or reported below
+      if (e.k === 'qty' || e.k === 'cur') continue; // consumed by an item or reported below
       var qi = -1;
       if (qtyFirst) { if (p > 0 && ev[p - 1].k === 'qty' && !used[p - 1]) qi = p - 1; }
       else if (p + 1 < ev.length && ev[p + 1].k === 'qty' && !used[p + 1]) qi = p + 1;
@@ -199,7 +228,8 @@
     }
     var warnings = [];
     ev.forEach(function (e, k) {
-      if (e.k === 'qty' && !used[k]) warnings.push('Quantity "' + e.text + '" has no item');
+      if (e.k === 'qty' && !used[k]) warnings.push((e.q.amount != null ? 'Amount "' : 'Quantity "') + e.text + '" has no item');
+      if (e.k === 'cur') warnings.push('"' + e.text + '" heard without a clear amount. Say or type it like "5 rubai".');
     });
     return { lines: lines, warnings: warnings, tokens: tokens };
   }
@@ -221,6 +251,15 @@
     if (!qe) {
       L.status = L.status === 'ok' ? 'noqty' : L.status; L.qty = null;
       L.note = (L.note ? L.note + ' ' : '') + 'Quantity not heard.';
+      return L;
+    }
+    if (qe.q.amount !== undefined) {
+      var a = qe.q.amount;
+      if (qe.q.bad || !(a > 0)) { L.status = 'check'; L.note = (L.note ? L.note + ' ' : '') + 'Could not read the rupee amount "' + qe.text + '". Type the amount.'; return L; }
+      L.amount = a; L.amountBased = true; L.qty = null;
+      L.status = L.status === 'noqty' ? 'ok' : L.status;
+      if (item.unit === 'pc') { L.status = 'check'; L.note = (L.note ? L.note + ' ' : '') + 'Rs amount for a piece item: no quantity will be recorded. Please confirm or enter pieces.'; }
+      if (a > 500) { L.status = 'check'; L.note = (L.note ? L.note + ' ' : '') + 'Large amount Rs ' + a + '. Please confirm.'; }
       return L;
     }
     var r = toBase(qe.q, item.unit);
