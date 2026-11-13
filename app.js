@@ -29,7 +29,8 @@
   function api(path, opt) { return fetch(path, Object.assign({ headers: hdr }, opt)).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; }); }); }
   function rs(n) { return 'Rs ' + (Math.round(n * 100) / 100).toFixed(2); }
   function byId(id) { return catalog.find(function (c) { return c.id === id; }); }
-  function qtyText(l) { return l.qty == null ? '' : (l.qty < 1 && l.unit !== 'pc' ? Math.round(l.qty * 1000) + ' ' + (l.unit === 'kg' ? 'g' : 'ml') + ' (' + l.qty + ' ' + l.unit + ')' : l.qty + ' ' + l.unit); }
+  function dq(l) { var it = byId(l.itemId); return it && l.amount > 0 ? VoiceBilling.derivedQty(it, Math.round(l.amount * 100)) : null; }
+  function qtyText(l) { if (l.amount > 0) { var d = dq(l); return 'Rs ' + l.amount + ' worth' + (d != null ? ' (about ' + d + ' ' + l.unit + ')' : ', no quantity'); } return l.qty == null ? '' : (l.qty < 1 && l.unit !== 'pc' ? Math.round(l.qty * 1000) + ' ' + (l.unit === 'kg' ? 'g' : 'ml') + ' (' + l.qty + ' ' + l.unit + ')' : l.qty + ' ' + l.unit); }
 
   // ---- tabs ----
   document.querySelectorAll('#tabs button').forEach(function (b) {
@@ -71,8 +72,8 @@
   $('clearSaid').onclick = function () { $('said').value = ''; };
   $('newBill').onclick = function () { lines = []; $('receipt').hidden = true; render(); };
 
-  function lineReady(l) { return l.itemId && l.qty > 0 && (l.status === 'ok' || l.confirmed); }
-  function amount(l) { var it = byId(l.itemId); return it && l.qty > 0 ? Math.round(it.price * 100 * l.qty) / 100 : 0; }
+  function lineReady(l) { return l.itemId && (l.qty > 0 || l.amount > 0) && (l.status === 'ok' || l.confirmed); }
+  function amount(l) { var it = byId(l.itemId); if (it && l.amount > 0) return l.amount; return it && l.qty > 0 ? Math.round(it.price * 100 * l.qty) / 100 : 0; }
 
   function render() {
     var box = $('lines'); box.textContent = '';
@@ -80,24 +81,26 @@
     lines.forEach(function (l, i) {
       var it = byId(l.itemId); var ready = lineReady(l);
       if (!ready) blockers++;
-      if (it && it.sample && l.qty > 0) sample = true;
+      if (it && it.sample && (l.amount > 0 ? dq(l) != null : l.qty > 0)) sample = true;
       total += amount(l);
-      var top = el('div', { class: 'top' }, [el('span', { text: it ? it.name + (it.ta ? ' / ' + it.ta : '') : (l.name || '?') }), el('span', { text: it && l.qty > 0 ? rs(amount(l)) : '' })]);
+      var top = el('div', { class: 'top' }, [el('span', { text: it ? it.name + (it.ta ? ' / ' + it.ta : '') : (l.name || '?') }), el('span', { text: it && (l.qty > 0 || l.amount > 0) ? rs(amount(l)) : '' })]);
       var cls = 'line ' + (ready ? '' : (l.status === 'ok' ? 'check' : l.status));
       var d = el('div', { class: cls.trim() }, [top]);
-      d.appendChild(el('div', { class: 'hint', text: 'Heard: "' + l.text + '"' + (it ? ' | ' + qtyText(l) + ' at ' + rs(it.price) + '/' + it.unit : '') }));
-      if (it && it.sample) d.lastChild.appendChild(el('span', { class: 'badge', text: 'SAMPLE price' }));
+      d.appendChild(el('div', { class: 'hint', text: 'Heard: "' + l.text + '"' + (it ? ' | ' + qtyText(l) + ' | catalog ' + rs(it.price) + '/' + it.unit : '') }));
+      if (it && it.sample && (!(l.amount > 0) || dq(l) != null)) d.lastChild.appendChild(el('span', { class: 'badge', text: 'SAMPLE price' }));
       if (l.note && !l.confirmed) d.appendChild(el('div', { class: 'note', text: l.note }));
       var sel = el('select', { 'aria-label': 'Item' });
       sel.appendChild(el('option', { value: '', text: '- choose item -' }));
       var ids = (l.candidates && l.candidates.length > 1) ? l.candidates : catalog.map(function (c) { return c.id; });
       ids.forEach(function (id) { var c = byId(id); if (c) { var o = el('option', { value: id, text: c.name }); if (id === l.itemId) o.selected = true; sel.appendChild(o); } });
       sel.onchange = function () { var c = byId(sel.value); l.itemId = sel.value || null; if (c) { l.unit = c.unit; l.name = c.name; if (l.status === 'unknown') l.status = 'check'; } l.confirmed = false; render(); };
-      var q = el('input', { type: 'number', step: 'any', min: '0', value: l.qty == null ? '' : String(l.qty), 'aria-label': 'Quantity (' + (l.unit || 'unit') + ')', placeholder: l.unit || 'qty' });
-      q.onchange = function () { var v = parseFloat(q.value); l.qty = v > 0 ? v : null; l.confirmed = false; if (l.status === 'noqty' && l.qty) l.status = 'check'; render(); };
+      var q = el('input', { type: 'number', step: 'any', min: '0', value: l.qty == null || l.amount > 0 ? '' : String(l.qty), 'aria-label': 'Quantity (' + (l.unit || 'unit') + ')', placeholder: l.unit || 'qty' });
+      q.onchange = function () { var v = parseFloat(q.value); l.qty = v > 0 ? v : null; if (v > 0) l.amount = null; l.confirmed = false; if (l.status === 'noqty' && l.qty) l.status = 'check'; render(); };
+      var am = el('input', { type: 'number', step: '0.01', min: '0', value: l.amount > 0 ? String(l.amount) : '', 'aria-label': 'Rupee amount', placeholder: 'or Rs' });
+      am.onchange = function () { var v = Math.round(parseFloat(am.value) * 100) / 100; l.amount = v > 0 ? v : null; if (v > 0) l.qty = null; l.confirmed = false; if (l.status === 'noqty' && l.amount) l.status = 'check'; render(); };
       var rm = el('button', { text: 'Remove' }); rm.onclick = function () { lines.splice(i, 1); render(); };
-      d.appendChild(el('div', { class: 'ctl' }, [sel, q, rm]));
-      if (!ready && l.itemId && l.qty > 0) { var ok = el('button', { class: 'primary', text: 'Confirm ' + (it ? it.name : '') + ' ' + l.qty + ' ' + (l.unit || '') }); ok.onclick = function () { l.confirmed = true; render(); }; d.appendChild(el('div', { class: 'row' }, [ok])); }
+      d.appendChild(el('div', { class: 'ctl' }, [sel, q, am, rm]));
+      if (!ready && l.itemId && (l.qty > 0 || l.amount > 0)) { var ok = el('button', { class: 'primary', text: 'Confirm ' + (it ? it.name : '') + ' ' + (l.amount > 0 ? 'Rs ' + l.amount : l.qty + ' ' + (l.unit || '')) }); ok.onclick = function () { l.confirmed = true; render(); }; d.appendChild(el('div', { class: 'row' }, [ok])); }
       box.appendChild(d);
     });
     if (!lines.length) box.appendChild(el('p', { class: 'hint', text: 'No items yet. Tap the mic and say the list, for example "poondu kaal kilo, arisi rendu kilo".' }));
@@ -109,7 +112,7 @@
 
   $('finalize').onclick = function () {
     $('finalize').disabled = true;
-    Store.postBill(lines.map(function (l) { return { itemId: l.itemId, qty: l.qty }; }))
+    Store.postBill(lines.map(function (l) { return l.amount > 0 ? { itemId: l.itemId, amount: l.amount } : { itemId: l.itemId, qty: l.qty }; }))
       .then(showReceipt).then(function () { lines = []; render(); })
       .catch(function (e) { $('gate').textContent = 'Could not save: ' + e.message; $('finalize').disabled = false; });
   };
@@ -118,7 +121,7 @@
     r.appendChild(el('h2', { text: 'Bill #' + b.no }));
     r.appendChild(el('p', { class: 'hint', text: new Date(b.ts).toLocaleString() + ' | Receipt only, not a GST tax invoice' }));
     var t = el('table'); t.appendChild(el('tr', {}, [el('th', { text: 'Item' }), el('th', { text: 'Qty' }), el('th', { class: 'r', text: 'Rs' })]));
-    b.lines.forEach(function (l) { t.appendChild(el('tr', {}, [el('td', { text: l.name }), el('td', { text: l.qty + ' ' + l.unit }), el('td', { class: 'r', text: l.amount.toFixed(2) })])); });
+    b.lines.forEach(function (l) { t.appendChild(el('tr', {}, [el('td', { text: l.name }), el('td', { text: VoiceBilling.lineQtyText(l) }), el('td', { class: 'r', text: l.amount.toFixed(2) })])); });
     t.appendChild(el('tr', {}, [el('th', { text: 'Total' }), el('th'), el('th', { class: 'r', text: b.total.toFixed(2) })]));
     r.appendChild(t);
     if (b.samplePrices) r.appendChild(el('p', { class: 'banner warn', text: 'This bill used SAMPLE prices. Not for a real sale.' }));
@@ -162,7 +165,7 @@
         var a = el('a', { class: 'btn', href: LOCAL ? '#' : '/api/bills/' + b.no + '/tally.xml' + (token ? '?token=' + encodeURIComponent(token) : ''), text: 'Tally draft XML' });
         if (LOCAL) a.onclick = (function (bb) { return function (ev) { ev.preventDefault(); download('bill-' + bb.no + '-tally-UNTESTED.xml', 'application/xml', VoiceBilling.toTallyXml(bb)); }; })(b);
         h.appendChild(el('div', { class: 'line' }, [el('div', { class: 'top' }, [el('span', { text: '#' + b.no + ' ' + new Date(b.ts).toLocaleString() }), el('span', { text: rs(b.total) })]),
-          el('div', { class: 'hint', text: b.lines.map(function (l) { return l.name + ' ' + l.qty + l.unit; }).join(', ') + (b.samplePrices ? ' (sample prices)' : '') }), a]));
+          el('div', { class: 'hint', text: b.lines.map(function (l) { return l.name + ' ' + VoiceBilling.lineQtyText(l); }).join(', ') + (b.samplePrices ? ' (sample prices)' : '') }), a]));
       });
       h.insertBefore(el('p', { class: 'hint', text: 'Today: ' + rs(sum) }), h.firstChild);
     }).catch(function (e) { $('history').textContent = 'Could not load: ' + e.message; });
