@@ -1,0 +1,21 @@
+*{box-sizing:border-box}body{margin:0;font:16px/1.4 system-ui,-apple-system,"Noto Sans Tamil",sans-serif;background:#f4f1ea;color:#1d2a24}
+header{background:#1f4d3a;color:#fff;padding:10px 14px;position:sticky;top:0;z-index:2}h1{margin:0 0 6px;font-size:20px}
+nav{display:flex;gap:6px}nav button{flex:1;background:#2d6a50;color:#fff;border:0;padding:9px;border-radius:8px;font-size:15px}nav button.on{background:#f2b632;color:#1d2a24;font-weight:600}
+main{max-width:720px;margin:0 auto;padding:12px}.card{background:#fff;border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 1px 3px #0002}
+h2{margin:0 0 8px;font-size:17px}label{font-size:13px;color:#555;display:block;margin-top:8px}
+textarea,input,select{width:100%;padding:9px;border:1px solid #bbb;border-radius:8px;font:inherit;background:#fff}
+.row{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}
+button,.btn{padding:11px 12px;border:1px solid #1f4d3a;background:#fff;color:#1f4d3a;border-radius:8px;font:inherit;font-weight:600;text-align:center;text-decoration:none;cursor:pointer}
+button.primary{background:#1f4d3a;color:#fff}button:disabled{opacity:.45;cursor:not-allowed}
+.mic{background:#c0392b;color:#fff;border:0;font-size:18px;padding:16px}.mic.live{background:#e67e22;animation:p 1s infinite}@keyframes p{50%{opacity:.7}}
+.hint{font-size:13px;color:#555;margin:6px 0 0}.banner{padding:10px;border-radius:8px;margin-bottom:12px}.warn{background:#fff3cd;border:1px solid #e0b100}
+.line{border:1px solid #ddd;border-left:6px solid #2e9e5b;border-radius:8px;padding:8px;margin-bottom:8px}
+.line.check{border-left-color:#e0a100;background:#fffaf0}.line.unknown,.line.noqty{border-left-color:#c0392b;background:#fff5f4}
+.line .top{display:flex;justify-content:space-between;gap:8px;font-weight:600}.line .note{font-size:13px;color:#8a4b00;margin:4px 0}
+.line .ctl{display:grid;grid-template-columns:2fr 1fr auto;gap:6px;margin-top:6px;align-items:center}.line .ctl button{padding:8px}
+.badge{font-size:11px;background:#f2b632;color:#1d2a24;padding:1px 6px;border-radius:6px;margin-left:4px}
+.total{display:flex;justify-content:space-between;font-size:20px;margin-top:8px;border-top:2px solid #1f4d3a;padding-top:8px}
+.crow{display:grid;grid-template-columns:1fr 1fr;gap:6px;border-bottom:1px solid #eee;padding:8px 0}.crow .w{grid-column:1/-1}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:4px 2px;font-size:14px}.r{text-align:right}
+@media print{header,nav,#tab-bill>.card:not(#receipt),#sampleBanner,button{display:none!important}body{background:#fff}}
+.mi{vertical-align:-4px;margin-right:4px}.mic{display:flex;align-items:center;justify-content:center;gap:6px}
