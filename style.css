@@ -7,7 +7,7 @@ textarea,input,select{width:100%;padding:9px;border:1px solid #bbb;border-radius
 .row{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}
 button,.btn{padding:11px 12px;border:1px solid #1f4d3a;background:#fff;color:#1f4d3a;border-radius:8px;font:inherit;font-weight:600;text-align:center;text-decoration:none;cursor:pointer}
 button.primary{background:#1f4d3a;color:#fff}button:disabled{opacity:.45;cursor:not-allowed}
-.mic{background:#c0392b;color:#fff;border:0;font-size:18px;padding:16px}.mic.live{background:#e67e22;animation:p 1s infinite}@keyframes p{50%{opacity:.7}}
+.mic{background:#c0392b;color:#fff;border:0;font-size:18px;padding:16px;-webkit-user-select:none;user-select:none;touch-action:manipulation}.mic.live{background:#e67e22;animation:p 1s infinite}.mic.locked{background:#2e9e5b;animation:p 1s infinite}#stopMic{background:#c0392b;color:#fff;border:0}@keyframes p{50%{opacity:.7}}
 .hint{font-size:13px;color:#555;margin:6px 0 0}.banner{padding:10px;border-radius:8px;margin-bottom:12px}.warn{background:#fff3cd;border:1px solid #e0b100}
 .line{border:1px solid #ddd;border-left:6px solid #2e9e5b;border-radius:8px;padding:8px;margin-bottom:8px}
 .line.check{border-left-color:#e0a100;background:#fffaf0}.line.unknown,.line.noqty{border-left-color:#c0392b;background:#fff5f4}
