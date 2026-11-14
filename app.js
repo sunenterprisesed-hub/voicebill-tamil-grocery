@@ -53,101 +53,23 @@
   });
 
   // ---- voice ----
-  // Two ways to listen:
-  //  - quick tap: one utterance, then it stops and adds what was said (unchanged).
-  //  - hold about half a second ("hold and lock"): keeps listening hands-free; each
-  //    pause-finalised segment is parsed into the bill on its own, until Stop is tapped.
-  //  Chrome ends the mic session on its own sometimes (silence, network, screen off);
-  //  a locked session just restarts. Nothing is ever finalized automatically.
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var mode = 'idle', sess = 0, netFails = 0, lastSeg = '', lastSegAt = 0, holdTimer = null, heldLock = false, lastPointerUp = 0;
-  var HELP = 'Speech is recognised by the browser\'s speech service (Chrome sends audio to Google). Say one item, pause a second or two, then the next. TAP once, speak, then check the text and tap Add to bill. HOLD the mic button to keep listening: items are added as you speak, until you tap Stop.' + (LOCAL ? ' Bills and catalog are saved only in this browser.' : '');
-  function setMicUi() {
-    $('mic').classList.toggle('live', mode !== 'idle');
-    $('mic').classList.toggle('locked', mode === 'lock');
-    $('lockIcon').hidden = mode !== 'lock';
-    $('stopMic').hidden = mode !== 'lock';
-    $('micLabel').textContent = mode === 'lock' ? 'Locked on' : mode === 'single' ? 'Listening... tap to stop' : 'Tap and speak';
-  }
-  function startRec(m) {
-    mode = m; setMicUi();
-    var r = new SR(); recog = r; var my = ++sess;
-    var firstFinal = (m === 'lock'); // only a restarted lock session's first final can be a replay
-    r.lang = $('lang').value; r.interimResults = true; r.continuous = (m === 'lock'); r.maxAlternatives = 1;
-    r.onresult = function (e) {
-      if (m === 'single') {
-        var t = ''; for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript + ' ';
-        $('said').value = t.trim(); return;
-      }
-      var interim = '';
-      for (var j = e.resultIndex; j < e.results.length; j++) {
-        var res = e.results[j];
-        if (res.isFinal) {
-          var ft = res[0].transcript.trim();
-          if (firstFinal && ft && ft === lastSeg && Date.now() - lastSegAt < 2500) { firstFinal = false; continue; } // recogniser replayed the previous session's last segment
-          firstFinal = false;
-          addSegment(ft); // a genuinely repeated order is always added
-        } else interim += res[0].transcript;
-      }
-      $('said').value = interim.trim(); // live preview only; segments are already added
-    };
-    r.onerror = function (ev) {
-      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
-        mode = 'idle'; setMicUi(); $('micHelp').textContent = 'Mic problem: ' + ev.error + ' (allow microphone for this site). You can type instead.'; return;
-      }
-      if (ev.error === 'network') {
-        netFails++;
-        if (netFails >= 4) { mode = 'idle'; setMicUi(); $('micHelp').textContent = 'Speech service unreachable (Chrome sends audio to Google for recognition). Check the internet and hold the mic again.'; }
-      }
-      // no-speech / audio-capture / aborted: onend decides; a locked session restarts there.
-    };
-    r.onend = function () {
-      if (my !== sess) return; // a newer session owns the mic
-      if (mode === 'single') { mode = 'idle'; setMicUi(); $('micHelp').textContent = HELP; return; } // transcript stays in the box for review + Add to bill
-      if (mode === 'lock') setTimeout(function () { if (mode === 'lock' && my === sess) startRec('lock'); }, 300);
-    };
-    try { r.start(); } catch (e) { mode = 'idle'; setMicUi(); }
-  }
-  function stopListening() {
-    mode = 'idle'; setMicUi();
-    if (recog) { try { recog.stop(); } catch (e) {} }
-    $('micHelp').textContent = HELP;
-  }
-  function addSegment(t) {
-    if (!t) return;
-    lastSeg = t; lastSegAt = Date.now(); netFails = 0;
-    var r = VoiceParser.parse(t, catalog);
-    r.lines.forEach(function (l) { l.confirmed = l.status === 'ok'; lines.push(l); });
-    $('warn').textContent = r.warnings.join(' ') || '';
-    $('heardLast').textContent = 'Last heard: "' + t + '"' + (r.lines.length ? '' : ' - nothing recognised');
-    render();
-  }
   function setupVoice() {
     if (!SR) { $('micHelp').textContent = 'Live speech needs Chrome or Edge (Android or desktop). This browser has none, so type or paste what was said.'; $('mic').disabled = true; return; }
     if (!window.isSecureContext) { $('micHelp').textContent = 'The microphone only works on https or localhost. Open the app that way, or type the order.'; $('mic').disabled = true; return; }
-    $('micHelp').textContent = HELP;
-    $('mic').addEventListener('contextmenu', function (e) { e.preventDefault(); });
-    $('mic').addEventListener('pointerdown', function () {
-      heldLock = false;
-      holdTimer = setTimeout(function () {
-        heldLock = true;
-        if (mode === 'idle') startRec('lock');
-        else if (mode === 'single') { if (recog) { try { recog.stop(); } catch (e) {} } startRec('lock'); } // upgrade to hands-free
-      }, 450);
-    });
-    $('mic').addEventListener('pointerup', function () {
-      clearTimeout(holdTimer); lastPointerUp = Date.now();
-      if (heldLock) { heldLock = false; return; } // a hold engaged the lock: release keeps it on
-      if (mode === 'idle') startRec('single'); else stopListening();
-    });
-    $('mic').addEventListener('pointercancel', function () { clearTimeout(holdTimer); heldLock = false; });
-    // keyboard activation (Enter/Space fires click without pointer events)
-    $('mic').addEventListener('click', function () { if (Date.now() - lastPointerUp < 600) return; if (mode === 'idle') startRec('single'); else stopListening(); });
-    $('stopMic').onclick = function () { stopListening(); };
-    // never keep listening in a hidden or closed page
-    document.addEventListener('visibilitychange', function () { if (document.hidden && mode !== 'idle') stopListening(); });
-    window.addEventListener('pagehide', function () { if (recog) { try { recog.abort(); } catch (e) {} } });
+    $('micHelp').textContent = 'Speech is recognised by the browser\'s speech service (Chrome sends audio to Google). Check the text, then Add to bill.' + (LOCAL ? ' Bills and catalog are saved only in this browser.' : '');
+    recog = new SR(); recog.interimResults = true; recog.continuous = false; recog.maxAlternatives = 1;
+    recog.onresult = function (e) { var t = ''; for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript + ' '; $('said').value = t.trim(); };
+    recog.onerror = function (e) { stopUi(); $('micHelp').textContent = 'Mic problem: ' + e.error + (e.error === 'not-allowed' ? ' (allow microphone for this site)' : '') + '. You can type instead.'; };
+    recog.onend = function () { var had = $('said').value.trim(); stopUi(); if (had) addFromText(); };
   }
+  function stopUi() { listening = false; $('mic').classList.remove('live'); $('micLabel').textContent = 'Tap and speak'; }
+  $('mic').onclick = function () {
+    if (!recog) return;
+    if (listening) { recog.stop(); return; }
+    $('said').value = ''; recog.lang = $('lang').value;
+    try { recog.start(); listening = true; $('mic').classList.add('live'); $('micLabel').textContent = 'Listening... tap to stop'; } catch (e) { stopUi(); }
+  };
 
   // ---- parsing into bill lines ----
   function addFromText() {
@@ -200,7 +122,6 @@
   }
 
   $('finalize').onclick = function () {
-    stopListening(); // the mic must not keep appending to the next bill
     $('finalize').disabled = true;
     Store.postBill(lines.map(function (l) { return l.amount > 0 ? { itemId: l.itemId, amount: l.amount } : { itemId: l.itemId, qty: l.qty }; }))
       .then(showReceipt).then(function () { lines = []; render(); })
