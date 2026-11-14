@@ -5,6 +5,13 @@
   'use strict';
 
   // ---- normalisation -------------------------------------------------------
+  // Speech-recognition confusables in Tamil script: ள/ல, ண/ன and ற/ர are constantly mixed up
+  // by the recogniser (e.g. jaggery heard as வெள்ளம் for catalog வெல்லம்). Canonicalise for
+  // MATCHING ONLY; the heard text and the catalog display keep their original spelling.
+  function tamilCanon(s) {
+    return String(s).replace(/\u0BB3/g, '\u0BB2').replace(/\u0BA3/g, '\u0BA9').replace(/\u0BB1/g, '\u0BB0');
+  }
+
   function skeleton(s) {
     return String(s).toLowerCase()
       .replace(/aa+/g, 'a').replace(/ee+|ii+/g, 'i').replace(/oo+|uu+/g, 'u')
@@ -17,7 +24,11 @@
     return String(text).replace(/[\u200c\u200d]/g, '')
       .replace(/(?:\u20B9|\brs\.?)\s*(\d[\d.]*)/gi, ' rs $1 ')
       .replace(/(\d)\s*(?:\u20B9|rs\b\.?|rupees?\b|rupais?\b|rubais?\b|\u0BB0\u0BC2\u0BAA\u0BBE\u0BAF\u0BCD(?:\u0B95\u0BCD\u0B95\u0BC1)?)/gi, '$1 rs ')
-      .replace(/\u20B9/g, ' rs ').split(/[\s,;|\/\u0964]+/)
+      .replace(/\u20B9/g, ' rs ')
+      // recognisers glue digits to words: "வெள்ளம்10rs", "5kg", "arisi2kilo"
+      .replace(/([a-z\u0B80-\u0BFF])(\d)/gi, '$1 $2')
+      .replace(/(\d)([a-z\u0B80-\u0BFF])/gi, '$1 $2')
+      .split(/[\s,;|\/\u0964]+/)
       .map(function (t) { return t.replace(/^[.:!?"'()]+|[.:!?"'()]+$/g, ''); })
       .filter(Boolean);
   }
@@ -139,7 +150,7 @@
 
   // ---- catalog index -------------------------------------------------------
   function buildIndex(catalog) {
-    var map = {}, list = [];
+    var map = {}, list = [], tmap = {};
     catalog.forEach(function (it) {
       var names = [it.name, it.ta].concat(it.aliases || []);
       names.forEach(function (n) {
@@ -149,9 +160,14 @@
         (map[key] = map[key] || []);
         if (map[key].indexOf(it.id) < 0) map[key].push(it.id);
         list.push({ key: key, id: it.id });
+        if (/[\u0B80-\u0BFF]/.test(key)) {
+          var ck = tamilCanon(key);
+          (tmap[ck] = tmap[ck] || []);
+          if (tmap[ck].indexOf(it.id) < 0) tmap[ck].push(it.id);
+        }
       });
     });
-    return { map: map, list: list, byId: catalog.reduce(function (a, it) { a[it.id] = it; return a; }, {}) };
+    return { map: map, list: list, tmap: tmap, byId: catalog.reduce(function (a, it) { a[it.id] = it; return a; }, {}) };
   }
 
   function lev(a, b) {
@@ -169,6 +185,15 @@
     for (n = Math.min(3, tokens.length - i); n >= 1; n--) {
       key = tokens.slice(i, i + n).map(skeleton).join(' ');
       if (idx.map[key]) return { ids: idx.map[key].slice(), used: n, exact: true };
+    }
+    // pronunciation variants: same word with confusable Tamil letters (வெள்ளம் for வெல்லம்).
+    // Exactly one catalog item canonicalises to it = match. Several = candidates to confirm,
+    // never a silent pick. Letters are NOT merged anywhere else (billing, display untouched).
+    for (n = Math.min(3, tokens.length - i); n >= 1; n--) {
+      key = tokens.slice(i, i + n).map(skeleton).join(' ');
+      if (!/[\u0B80-\u0BFF]/.test(key)) continue;
+      var vids = idx.tmap[tamilCanon(key)];
+      if (vids) return { ids: vids.slice(), used: n, exact: true, variant: true };
     }
     // fuzzy: single/double token vs alias keys (typos, speech-recognition drift)
     var best = null;
@@ -237,9 +262,17 @@
   function buildLine(e, qe, idx) {
     var L = { text: e.text + (qe ? ' ' + qe.text : ''), itemId: null, qty: null, unit: null, status: 'ok', note: '', candidates: [] };
     if (e.k === 'unk') {
-      L.status = 'unknown'; L.note = 'Item not in catalog: "' + e.text + '". Add it to the catalog or pick one.';
-      L.name = e.text;
-      if (qe) { L.qtyText = qe.text; }
+      L.status = 'unknown'; L.name = e.text;
+      if (qe) {
+        L.qtyText = qe.text;
+        // a heard rupee amount survives item resolution: kept on the line and applied to
+        // whichever item the shopkeeper picks, so "வெள்ளம் 10 rs" never loses its Rs 10.
+        if (qe.q.amount !== undefined && !qe.q.bad && qe.q.amount > 0) { L.amount = qe.q.amount; L.amountBased = true; }
+        else if (qe.q.amount !== undefined || qe.q.bad) L.badAmount = true;
+      }
+      L.note = 'Item not in catalog: "' + e.text + '". Add it to the catalog or pick one.' +
+        (L.amount ? ' The Rs ' + L.amount + ' is kept and will apply to the item you pick.' : '') +
+        (L.badAmount ? ' The rupee amount was not clear; type it in the Rs box.' : '');
       return L;
     }
     L.candidates = e.ids.slice();
@@ -271,6 +304,6 @@
     return L;
   }
 
-  var api = { parse: parse, skeleton: skeleton, tokenize: tokenize, buildIndex: buildIndex, lev: lev };
+  var api = { parse: parse, skeleton: skeleton, tamilCanon: tamilCanon, tokenize: tokenize, buildIndex: buildIndex, lev: lev };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.VoiceParser = api;
 })(typeof window !== 'undefined' ? window : globalThis);
