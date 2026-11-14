@@ -16,10 +16,12 @@
   <div id="sampleBanner" class="banner warn" hidden>Prices marked SAMPLE are placeholders. Set real prices in the Catalog tab before billing a customer.</div>
   <div class="card">
     <div class="row">
-      <button id="mic" class="mic" aria-label="Speak"><svg class="mi" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11z"/></svg> <span id="micLabel">Tap and speak</span></button>
+      <button id="mic" class="mic" aria-label="Speak"><svg class="mi" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11z"/></svg><svg id="lockIcon" class="mi" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" hidden><path fill="currentColor" d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 1 1 6 0v3z"/></svg> <span id="micLabel">Tap and speak</span></button>
       <select id="lang" aria-label="Speech language"><option value="ta-IN">Tamil (ta-IN)</option><option value="en-IN">English (en-IN)</option></select>
     </div>
+    <div class="row"><button id="stopMic" hidden>Stop listening</button></div>
     <p id="micHelp" class="hint"></p>
+    <p id="heardLast" class="hint"></p>
     <label for="said">What was heard (edit if wrong, or type)</label>
     <textarea id="said" rows="2" placeholder='e.g. poondu kaal kilo, arisi rendu kilo'></textarea>
     <div class="row"><button id="add" class="primary">Add to bill</button><button id="clearSaid">Clear</button></div>
