@@ -16,7 +16,18 @@
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { throw new Error('This browser blocked saving data (' + e.name + ')'); } }
   function download(name, type, text) { var u = URL.createObjectURL(new Blob([text], { type: type })); var x = document.createElement('a'); x.href = u; x.download = name; document.body.appendChild(x); x.click(); x.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 1000); }
   var Store = LOCAL ? {
-    getCatalog: function () { return Promise.resolve(lsGet('vb.catalog.v1', null) || JSON.parse(JSON.stringify(window.VB_SEED))); },
+    getCatalog: function () {
+      var stored = lsGet('vb.catalog.v1', null);
+      if (!stored) { var fresh = JSON.parse(JSON.stringify(window.VB_SEED)); lsSet('vb.catalog.v1', fresh); return Promise.resolve(fresh); }
+      // app updates add spoken aliases to the seed; merge them into the stored catalog
+      // without touching edited prices, custom items, deletions or history.
+      var m = VoiceBilling.mergeSeedAliases(stored, window.VB_SEED);
+      if (!m.changed) return Promise.resolve(stored);
+      var v = VoiceBilling.validateCatalog(m.catalog);
+      if (v.error) return Promise.resolve(stored);
+      lsSet('vb.catalog.v1', v.catalog);
+      return Promise.resolve(v.catalog);
+    },
     putCatalog: function (c) { var r = VoiceBilling.validateCatalog(c); return r.error ? Promise.reject(new Error(r.error)) : (lsSet('vb.catalog.v1', r.catalog), Promise.resolve(r.catalog)); },
     postBill: function (ls) { try { var r = VoiceBilling.priceBill(ls, catalog); if (r.error) throw new Error(r.error); var all = lsGet('vb.bills.v1', []); var no = all.reduce(function (m, b) { return Math.max(m, b.no); }, 0) + 1; var bill = Object.assign({ no: no, ts: new Date().toISOString() }, r.bill); all.push(bill); lsSet('vb.bills.v1', all); return Promise.resolve(bill); } catch (e) { return Promise.reject(e); } },
     getBills: function () { return Promise.resolve(lsGet('vb.bills.v1', [])); }
