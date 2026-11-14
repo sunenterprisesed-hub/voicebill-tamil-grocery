@@ -90,6 +90,25 @@ function toTallyXml(b) {
 }
 
 
-var api = { validateCatalog: validateCatalog, priceBill: priceBill, derivedQty: derivedQty, lineQtyText: lineQtyText, toCsv: toCsv, toTallyXml: toTallyXml };
+// Merge NEW seed aliases into a stored catalog without touching the shopkeeper's edits:
+// prices, names, units, sample flags and custom items stay; deleted items stay deleted.
+// Only aliases listed in the seed but missing locally are appended. Idempotent.
+function mergeSeedAliases(stored, seed) {
+  if (!Array.isArray(stored) || !Array.isArray(seed)) return { catalog: stored, changed: false };
+  const seedBy = new Map(seed.map((s) => [s && s.id, s]));
+  let changed = false;
+  const out = stored.map((it) => {
+    const s = it && seedBy.get(it.id);
+    if (!s || !Array.isArray(s.aliases)) return it;
+    const have = new Set(Array.isArray(it.aliases) ? it.aliases : []);
+    const add = s.aliases.filter((a) => a && !have.has(a));
+    if (!add.length) return it;
+    changed = true;
+    return Object.assign({}, it, { aliases: (Array.isArray(it.aliases) ? it.aliases : []).concat(add) });
+  });
+  return { catalog: out, changed };
+}
+
+var api = { validateCatalog: validateCatalog, priceBill: priceBill, derivedQty: derivedQty, lineQtyText: lineQtyText, toCsv: toCsv, toTallyXml: toTallyXml, mergeSeedAliases: mergeSeedAliases };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.VoiceBilling = api;
 })(typeof window !== 'undefined' ? window : globalThis);
