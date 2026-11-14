@@ -61,7 +61,7 @@
   //  a locked session just restarts. Nothing is ever finalized automatically.
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var mode = 'idle', sess = 0, netFails = 0, lastSeg = '', lastSegAt = 0, holdTimer = null, heldLock = false, lastPointerUp = 0;
-  var HELP = 'Speech is recognised by the browser\'s speech service (Chrome sends audio to Google). Say one item, pause a second or two, then the next. Tap once for one utterance; HOLD the mic button to keep listening until you tap Stop.' + (LOCAL ? ' Bills and catalog are saved only in this browser.' : '');
+  var HELP = 'Speech is recognised by the browser\'s speech service (Chrome sends audio to Google). Say one item, pause a second or two, then the next. TAP once, speak, then check the text and tap Add to bill. HOLD the mic button to keep listening: items are added as you speak, until you tap Stop.' + (LOCAL ? ' Bills and catalog are saved only in this browser.' : '');
   function setMicUi() {
     $('mic').classList.toggle('live', mode !== 'idle');
     $('mic').classList.toggle('locked', mode === 'lock');
@@ -72,6 +72,7 @@
   function startRec(m) {
     mode = m; setMicUi();
     var r = new SR(); recog = r; var my = ++sess;
+    var firstFinal = (m === 'lock'); // only a restarted lock session's first final can be a replay
     r.lang = $('lang').value; r.interimResults = true; r.continuous = (m === 'lock'); r.maxAlternatives = 1;
     r.onresult = function (e) {
       if (m === 'single') {
@@ -81,7 +82,12 @@
       var interim = '';
       for (var j = e.resultIndex; j < e.results.length; j++) {
         var res = e.results[j];
-        if (res.isFinal) addSegment(res[0].transcript); else interim += res[0].transcript;
+        if (res.isFinal) {
+          var ft = res[0].transcript.trim();
+          if (firstFinal && ft && ft === lastSeg && Date.now() - lastSegAt < 2500) { firstFinal = false; continue; } // recogniser replayed the previous session's last segment
+          firstFinal = false;
+          addSegment(ft); // a genuinely repeated order is always added
+        } else interim += res[0].transcript;
       }
       $('said').value = interim.trim(); // live preview only; segments are already added
     };
@@ -97,22 +103,19 @@
     };
     r.onend = function () {
       if (my !== sess) return; // a newer session owns the mic
-      if (mode === 'single') { var had = $('said').value.trim(); mode = 'idle'; setMicUi(); if (had) addFromText(); return; }
+      if (mode === 'single') { mode = 'idle'; setMicUi(); $('micHelp').textContent = HELP; return; } // transcript stays in the box for review + Add to bill
       if (mode === 'lock') setTimeout(function () { if (mode === 'lock' && my === sess) startRec('lock'); }, 300);
     };
     try { r.start(); } catch (e) { mode = 'idle'; setMicUi(); }
   }
   function stopListening() {
-    var was = mode; mode = 'idle'; setMicUi();
+    mode = 'idle'; setMicUi();
     if (recog) { try { recog.stop(); } catch (e) {} }
-    if (was === 'single') { var had = $('said').value.trim(); if (had) addFromText(); }
     $('micHelp').textContent = HELP;
   }
-  function addSegment(text) {
-    var t = text.trim(); if (!t) return;
-    var now = Date.now();
-    if (t === lastSeg && now - lastSegAt < 1500) return; // recogniser repeated a segment across a restart
-    lastSeg = t; lastSegAt = now; netFails = 0;
+  function addSegment(t) {
+    if (!t) return;
+    lastSeg = t; lastSegAt = Date.now(); netFails = 0;
     var r = VoiceParser.parse(t, catalog);
     r.lines.forEach(function (l) { l.confirmed = l.status === 'ok'; lines.push(l); });
     $('warn').textContent = r.warnings.join(' ') || '';
@@ -141,6 +144,9 @@
     // keyboard activation (Enter/Space fires click without pointer events)
     $('mic').addEventListener('click', function () { if (Date.now() - lastPointerUp < 600) return; if (mode === 'idle') startRec('single'); else stopListening(); });
     $('stopMic').onclick = function () { stopListening(); };
+    // never keep listening in a hidden or closed page
+    document.addEventListener('visibilitychange', function () { if (document.hidden && mode !== 'idle') stopListening(); });
+    window.addEventListener('pagehide', function () { if (recog) { try { recog.abort(); } catch (e) {} } });
   }
 
   // ---- parsing into bill lines ----
@@ -194,6 +200,7 @@
   }
 
   $('finalize').onclick = function () {
+    stopListening(); // the mic must not keep appending to the next bill
     $('finalize').disabled = true;
     Store.postBill(lines.map(function (l) { return l.amount > 0 ? { itemId: l.itemId, amount: l.amount } : { itemId: l.itemId, qty: l.qty }; }))
       .then(showReceipt).then(function () { lines = []; render(); })
