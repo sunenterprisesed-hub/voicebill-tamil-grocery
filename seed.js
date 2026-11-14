@@ -19,7 +19,7 @@ var rows = [
   ['urad-dal', 'Urad dal', 'உளுந்து', 'kg', 140, 'urad dal|ulundhu|ulunthu|ulundu|paruppu|பருப்பு'],
   ['kadala-paruppu', 'Chana dal', 'கடலைப்பருப்பு', 'kg', 100, 'kadalai paruppu|kadala paruppu|chana dal|paruppu|பருப்பு'],
   ['sugar', 'Sugar', 'சர்க்கரை', 'kg', 45, 'sakkarai|sarkarai|chakkarai|chakkara|sakkara|sarkara|chakra|seeni|sugar|சர்க்கரை|சக்கரை|சக்கரா|சக்கர|சீனி'],
-  ['jaggery', 'Jaggery', 'வெல்லம்', 'kg', 70, 'vellam|jaggery'],
+  ['jaggery', 'Jaggery', 'வெல்லம்', 'kg', 70, 'vellam|jaggery|வெள்ளம்|வெல்லாம்'],
   ['salt', 'Salt', 'உப்பு', 'kg', 20, 'uppu|salt'],
   ['tamarind', 'Tamarind', 'புளி', 'kg', 200, 'puli|tamarind'],
   ['coriander-seeds', 'Coriander seeds', 'மல்லி', 'kg', 140, 'coriander seeds|malli|dhaniya'],
