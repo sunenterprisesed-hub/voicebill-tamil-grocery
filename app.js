@@ -47,8 +47,8 @@
   document.querySelectorAll('#tabs button').forEach(function (b) {
     b.onclick = function () {
       document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.toggle('on', x === b); });
-      ['bill', 'catalog', 'history'].forEach(function (t) { $('tab-' + t).hidden = t !== b.dataset.tab; });
-      if (b.dataset.tab === 'history') loadHistory(); if (b.dataset.tab === 'catalog') renderCatalog();
+      ['bill', 'catalog', 'history', 'summary'].forEach(function (t) { $('tab-' + t).hidden = t !== b.dataset.tab; });
+      if (b.dataset.tab === 'history') loadHistory(); if (b.dataset.tab === 'catalog') renderCatalog(); if (b.dataset.tab === 'summary') renderSummary();
     };
   });
 
@@ -82,6 +82,23 @@
   $('add').onclick = addFromText;
   $('clearSaid').onclick = function () { $('said').value = ''; };
   $('newBill').onclick = function () { lines = []; $('receipt').hidden = true; render(); };
+  $('undo').onclick = function () { lines.pop(); render(); };
+
+  // ---- read the total aloud (voice-first: the shopkeeper hears the bill) ----
+  var speakOn = lsGet('vb.speakTotal', false);
+  function speakUi() { $('speakTotal').setAttribute('aria-pressed', speakOn ? 'true' : 'false'); $('speakTotal').textContent = 'Read total aloud: ' + (speakOn ? 'on' : 'off'); }
+  $('speakTotal').onclick = function () {
+    speakOn = !speakOn; try { lsSet('vb.speakTotal', speakOn); } catch (e) { /* private mode: keep it for this session */ }
+    if (!speakOn && window.speechSynthesis) window.speechSynthesis.cancel();
+    speakUi();
+  };
+  function speakTotal(total) {
+    if (!speakOn || !window.speechSynthesis) return;
+    var tamil = $('lang').value === 'ta-IN';
+    var u = new SpeechSynthesisUtterance(tamil ? 'மொத்தம் ' + total + ' ரூபாய்' : 'Total ' + total + ' rupees');
+    u.lang = tamil ? 'ta-IN' : 'en-IN';
+    window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+  }
 
   function lineReady(l) { return l.itemId && (l.qty > 0 || l.amount > 0) && (l.status === 'ok' || l.confirmed); }
   function amount(l) { var it = byId(l.itemId); if (it && l.amount > 0) return l.amount; return it && l.qty > 0 ? Math.round(it.price * 100 * l.qty) / 100 : 0; }
@@ -119,12 +136,13 @@
     $('sampleBanner').hidden = !sample;
     $('gate').textContent = !lines.length ? '' : blockers ? blockers + ' line(s) still need a fix or confirmation.' : 'All lines confirmed.';
     $('finalize').disabled = !lines.length || blockers > 0;
+    $('undo').disabled = !lines.length;
   }
 
   $('finalize').onclick = function () {
     $('finalize').disabled = true;
     Store.postBill(lines.map(function (l) { return l.amount > 0 ? { itemId: l.itemId, amount: l.amount } : { itemId: l.itemId, qty: l.qty }; }))
-      .then(showReceipt).then(function () { lines = []; render(); })
+      .then(function (b) { speakTotal(b.total); return showReceipt(b); }).then(function () { lines = []; render(); })
       .catch(function (e) { $('gate').textContent = 'Could not save: ' + e.message; $('finalize').disabled = false; });
   };
   function showReceipt(b) {
@@ -138,6 +156,9 @@
     if (b.samplePrices) r.appendChild(el('p', { class: 'banner warn', text: 'This bill used SAMPLE prices. Not for a real sale.' }));
     var pr = el('button', { text: 'Print / save PDF' }); pr.onclick = function () { window.print(); };
     r.appendChild(pr);
+    // Share the receipt as ready-to-send text; the shopkeeper picks the contact inside WhatsApp.
+    var wa = el('a', { class: 'btn', href: Summary.waMeLink(Summary.billShareText(b, VoiceBilling.lineQtyText)), target: '_blank', rel: 'noopener', text: 'Send bill on WhatsApp' });
+    r.appendChild(wa);
     r.scrollIntoView();
   }
 
@@ -184,6 +205,29 @@
     else if (token) $('csv').href = '/api/bills.csv?token=' + encodeURIComponent(token);
   }
 
+  // ---- day summary ----
+  function renderSummary() {
+    var d = $('sumDate'); if (!d.value) d.value = Summary.todayKey();
+    Store.getBills().then(function (bills) {
+      var s = Summary.summarizeBills(bills, d.value);
+      var box = $('sumBox'); box.textContent = '';
+      box.appendChild(el('p', { class: 'hint', text: s.count ? s.count + ' bill(s) | Total ' + rs(s.total) + ' | Average bill ' + rs(s.avg) + (s.sample ? ' | includes SAMPLE prices' : '') : 'No bills on this day.' }));
+      if (s.top) box.appendChild(el('p', { class: 'hint', text: 'Top item by sales: ' + s.top }));
+      if (s.items.length) {
+        var t = el('table');
+        t.appendChild(el('tr', {}, [el('th', { text: 'Item' }), el('th', { text: 'Qty sold' }), el('th', { class: 'r', text: 'Rs' })]));
+        s.items.forEach(function (it) {
+          t.appendChild(el('tr', {}, [el('td', { text: it.name }), el('td', { text: it.qtyKnown && it.qty != null ? it.qty + ' ' + it.unit : '-' }), el('td', { class: 'r', text: it.amount.toFixed(2) })]));
+        });
+        box.appendChild(t);
+      }
+      var wa = $('sumShare');
+      if (s.count) { wa.hidden = false; wa.href = Summary.waMeLink(Summary.summaryShareText(s)); } else { wa.hidden = true; }
+    }).catch(function (e) { $('sumBox').textContent = 'Could not load: ' + e.message; });
+  }
+  $('sumDate').onchange = renderSummary;
+
+  speakUi();
   setupVoice();
   Store.getCatalog().then(function (c) { catalog = c; render(); }).catch(function (e) { $('lines').textContent = 'Cannot load catalog: ' + e.message; });
 })();
