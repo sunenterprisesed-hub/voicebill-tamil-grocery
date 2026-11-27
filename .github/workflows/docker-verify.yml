@@ -1,0 +1,46 @@
+name: Verify Docker one-command start
+# Runs the exact submission requirement: docker compose up starts the app with no keys.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/docker-verify.yml'
+
+jobs:
+  compose-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start with Compose
+        run: docker compose up --build -d
+
+      - name: App answers on port 8787 with the main screen
+        run: |
+          ok=""
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8787/ -o /tmp/vb-index.html; then ok=1; break; fi
+            sleep 2
+          done
+          test -n "$ok"
+          grep -q 'Voice Bill' /tmp/vb-index.html
+          grep -q 'Summary' /tmp/vb-index.html
+
+      - name: Bill API saves a bill (201)
+        run: |
+          code=$(curl -s -o /tmp/vb-bill.json -w '%{http_code}' \
+            -X POST http://localhost:8787/api/bills \
+            -H 'Content-Type: application/json' \
+            -H 'Origin: http://localhost:8787' \
+            -d '{"lines":[{"itemId":"garlic","qty":0.25},{"itemId":"egg","qty":6}]}')
+          cat /tmp/vb-bill.json
+          test "$code" = "201"
+          grep -q 'Garlic' /tmp/vb-bill.json
+
+      - name: Container logs
+        if: always()
+        run: docker compose logs
+
+      - name: Shut down
+        if: always()
+        run: docker compose down
