@@ -3,10 +3,10 @@
 //   dist/standalone/voicebill.html  - one self-contained file
 //   dist/site/                      - same app as plain static files (for any https static host)
 const fs = require('fs'); const path = require('path'); const crypto = require('crypto');
-const P = path.join(__dirname, 'public'); const D = path.join(__dirname, 'dist');
+const P = __dirname; const D = path.join(__dirname, 'dist');
 const rd = (f) => fs.readFileSync(path.join(P, f), 'utf8');
 fs.rmSync(D, { recursive: true, force: true }); fs.mkdirSync(path.join(D, 'standalone'), { recursive: true }); fs.mkdirSync(path.join(D, 'site'), { recursive: true });
-const scripts = ['seed.js', 'billing-core.js', 'parser.js', 'mode.js', 'app.js'];
+const scripts = ['seed.js', 'billing-core.js', 'summary-core.js', 'parser.js', 'mode.js', 'app.js'];
 const src = Object.fromEntries(scripts.map((f) => [f, rd(f)]));
 src['mode.js'] = 'window.VB_LOCAL_MODE = true;\n';
 const meta = (extra) => '<meta http-equiv="Content-Security-Policy" content="' + extra + '">';
