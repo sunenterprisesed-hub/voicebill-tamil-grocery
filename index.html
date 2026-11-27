@@ -9,7 +9,7 @@
 </head>
 <body>
 <header><h1>Voice Bill</h1><nav id="tabs">
-  <button data-tab="bill" class="on">Bill</button><button data-tab="catalog">Catalog</button><button data-tab="history">History</button>
+  <button data-tab="bill" class="on">Bill</button><button data-tab="catalog">Catalog</button><button data-tab="history">History</button><button data-tab="summary">Summary</button>
 </nav></header>
 <main>
 <section id="tab-bill">
@@ -30,7 +30,8 @@
     <div id="lines" class="lines"></div>
     <div class="total"><span>Total</span><strong id="total">Rs 0.00</strong></div>
     <p id="gate" class="hint"></p>
-    <div class="row"><button id="finalize" class="primary" disabled>Confirm and finalize bill</button><button id="newBill">Clear bill</button></div>
+    <div class="row"><button id="finalize" class="primary" disabled>Confirm and finalize bill</button><button id="undo" disabled>Undo last line</button><button id="newBill">Clear bill</button></div>
+    <div class="row"><button id="speakTotal" aria-pressed="false">Read total aloud: off</button></div>
   </div>
   <div id="receipt" class="card" hidden></div>
 </section>
@@ -46,9 +47,16 @@
   <div class="row"><a id="csv" class="btn" href="/api/bills.csv">Download CSV</a></div>
   <p class="hint">Tally export is a draft file per bill. It has not been tested against a real TallyPrime and nothing is sent to any accounting software.</p></div>
 </section>
+<section id="tab-summary" hidden>
+  <div class="card"><h2>Day summary</h2>
+  <div class="row"><input type="date" id="sumDate" aria-label="Day"><a id="sumShare" class="btn" href="#" target="_blank" rel="noopener" hidden>Send summary on WhatsApp</a></div>
+  <div id="sumBox"></div>
+  <p class="hint">Totals come from the bills saved on this device. Nothing is uploaded anywhere.</p></div>
+</section>
 </main>
 <script src="seed.js"></script>
 <script src="billing-core.js"></script>
+<script src="summary-core.js"></script>
 <script src="parser.js"></script>
 <script src="mode.js"></script>
 <script src="app.js"></script>
