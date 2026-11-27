@@ -8,7 +8,9 @@ const path = require('path');
 const { makeStore } = require('./store');
 const { validateCatalog, priceBill, toCsv, toTallyXml } = require('./billing');
 
-const PUB = path.join(__dirname, '..', 'public');
+const ROOT = path.join(__dirname, '..');
+// Only these app files are ever served; source, tests and data stay unreachable.
+const SERVE = { 'index.html': 1, 'style.css': 1, 'app.js': 1, 'parser.js': 1, 'seed.js': 1, 'billing-core.js': 1, 'summary-core.js': 1, 'mode.js': 1 };
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
 const MAX_BODY = 256 * 1024;
@@ -71,14 +73,15 @@ function createServer(dataDir, opts = {}) {
         }
         return send(res, 404, { error: 'not found' });
       }
-      // static
+      // static: a fixed whitelist of app files from the repo root.
       if (req.method !== 'GET') return send(res, 405, { error: 'method' });
       const rel = p === '/' ? 'index.html' : decodeURIComponent(p).replace(/^\/+/, '');
-      const file = path.normalize(path.join(PUB, rel));
-      if (!file.startsWith(PUB + path.sep) && file !== PUB) return send(res, 403, 'forbidden', 'text/plain');
-      fs.readFile(file, (err, data) => {
+      if (!SERVE[rel]) return send(res, 404, 'not found', 'text/plain');
+      // server mode always stores on the server, whatever the static hosting copy says
+      if (rel === 'mode.js') return send(res, 200, 'window.VB_LOCAL_MODE = false;\n', MIME['.js']);
+      fs.readFile(path.join(ROOT, rel), (err, data) => {
         if (err) return send(res, 404, 'not found', 'text/plain');
-        send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream');
+        send(res, 200, data, MIME[path.extname(rel)] || 'application/octet-stream');
       });
     } catch (e) {
       send(res, e.code === 413 ? 413 : e.code === 400 ? 400 : 500, { error: e.code === 413 || e.code === 400 ? e.message : 'server error' });
@@ -88,9 +91,12 @@ function createServer(dataDir, opts = {}) {
 
 if (require.main === module) {
   const port = Number(process.env.PORT || 8787);
-  const host = process.env.HOST || '127.0.0.1';
+  // BIND_ALL=1 is for containers (Docker): the container's port mapping controls exposure,
+  // so binding 0.0.0.0 without an APP_TOKEN is safe there. Outside a container the old guard stands.
+  const bindAll = process.env.BIND_ALL === '1';
+  const host = process.env.HOST || (bindAll ? '0.0.0.0' : '127.0.0.1');
   const dir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-  if (host !== '127.0.0.1' && host !== 'localhost' && !process.env.APP_TOKEN) {
+  if (host !== '127.0.0.1' && host !== 'localhost' && !process.env.APP_TOKEN && !bindAll) {
     console.error('Refusing to listen on a network address without APP_TOKEN set. Example: HOST=0.0.0.0 APP_TOKEN=choose-a-secret npm start');
     process.exit(1);
   }
