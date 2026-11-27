@@ -36,7 +36,7 @@ Outside a container it still refuses to listen on a network address without APP_
 - Data (catalog, bills) is stored in data/*.json on the machine running the server. No login. By default the server only listens on 127.0.0.1; to expose it on a network you must set APP_TOKEN (the server refuses otherwise).
 - Prototype: no GST handling, no stock, no multi-shop accounts.
 
-## New in Round 2 (27-30 Nov)
+## New in Round 2 (added 27 Nov, build window 27-30 Nov)
 - **Day summary tab**: pick a day, see bill count, total and average sales, top-selling item and per-item quantities. Undo-last-line makes fixing a misheard item one tap. Share the summary on WhatsApp as ready-to-send text.
 - **Read total aloud**: optional voice-out of the finalized total (Tamil or English, matching the mic language), so the shopkeeper hears the bill.
 - **Send bill on WhatsApp**: every finalized receipt gets a wa.me link with the receipt as text (receipt only, not a GST tax invoice). The shopkeeper picks the contact inside WhatsApp; nothing is uploaded.
@@ -55,6 +55,6 @@ Outside a container it still refuses to listen on a network address without APP_
     Dockerfile, docker-compose.yml  one-command start
 
 ## Hackathon provenance (India Runs on Voice, Scaler x Wispr Flow)
-First working version built 13-14 Nov 2026 during Round 1. Extended 27-28 Nov 2026 during the
+First working version built 13-14 Nov 2026 during Round 1. Extended 27 Nov 2026 during the
 Round 2 build window with the Round 2 features above (see git history). All code in this repo is
 original project code, not a starter template.
