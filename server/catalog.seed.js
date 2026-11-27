@@ -1,2 +1,2 @@
 'use strict';
-module.exports = require('../public/seed.js');
+module.exports = require('../seed.js');
