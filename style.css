@@ -20,3 +20,5 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:4px 2px;
 @media print{header,nav,#tab-bill>.card:not(#receipt),#sampleBanner,button{display:none!important}body{background:#fff}}
 .mi{vertical-align:-4px;margin-right:4px}.mic{display:flex;align-items:center;justify-content:center;gap:6px}
 .line .ctl select{grid-column:1/-1}
+
+.line > a.btn{display:block;margin-top:8px}
