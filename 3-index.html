@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Bill - Tamil grocery billing</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; style-src 'self'; script-src 'self'">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><h1>Voice Bill</h1><nav id="tabs">
+  <button data-tab="bill" class="on">Bill</button><button data-tab="catalog">Catalog</button><button data-tab="history">History</button><button data-tab="summary">Summary</button>
+</nav></header>
+<main>
+<section id="tab-bill">
+  <div id="sampleBanner" class="banner warn" hidden>Prices marked SAMPLE are placeholders. Set real prices in the Catalog tab before billing a customer.</div>
+  <div class="card">
+    <div class="row">
+      <button id="mic" class="mic" aria-label="Speak"><svg class="mi" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11z"/></svg> <span id="micLabel">Tap and speak</span></button>
+      <select id="lang" aria-label="Speech language"><option value="ta-IN">Tamil (ta-IN)</option><option value="en-IN">English (en-IN)</option></select>
+    </div>
+    <p id="micHelp" class="hint"></p>
+    <label for="said">What was heard (edit if wrong, or type)</label>
+    <textarea id="said" rows="2" placeholder='e.g. poondu kaal kilo, arisi rendu kilo'></textarea>
+    <div class="row"><button id="add" class="primary">Add to bill</button><button id="clearSaid">Clear</button></div>
+    <div id="warn" class="hint"></div>
+  </div>
+  <div class="card">
+    <h2>Bill</h2>
+    <div id="lines" class="lines"></div>
+    <div class="total"><span>Total</span><strong id="total">Rs 0.00</strong></div>
+    <p id="gate" class="hint"></p>
+    <div class="row"><button id="finalize" class="primary" disabled>Confirm and finalize bill</button><button id="undo" disabled>Undo last line</button><button id="newBill">Clear bill</button></div>
+    <div class="row"><button id="speakTotal" aria-pressed="false">Read total aloud: off</button></div>
+  </div>
+  <div id="receipt" class="card" hidden></div>
+</section>
+<section id="tab-catalog" hidden>
+  <div class="card"><h2>Shop catalog</h2>
+  <p class="hint">Bill prices come only from here. Editing a price removes its SAMPLE flag. Aliases are the ways people say the item, separated by commas (Tamil letters or Tanglish).</p>
+  <div id="catalogRows"></div>
+  <div class="row"><button id="addItem">Add item</button><button id="saveCatalog" class="primary">Save catalog</button></div>
+  <p id="catMsg" class="hint"></p></div>
+</section>
+<section id="tab-history" hidden>
+  <div class="card"><h2>Bills</h2><div id="history"></div>
+  <div class="row"><a id="csv" class="btn" href="/api/bills.csv">Download CSV</a></div>
+  <p class="hint">Tally export is a draft file per bill. It has not been tested against a real TallyPrime and nothing is sent to any accounting software.</p></div>
+</section>
+<section id="tab-summary" hidden>
+  <div class="card"><h2>Day summary</h2>
+  <div class="row"><input type="date" id="sumDate" aria-label="Day"><a id="sumShare" class="btn" href="#" target="_blank" rel="noopener" hidden>Send summary on WhatsApp</a></div>
+  <div id="sumBox"></div>
+  <p class="hint">Totals come from the bills saved on this device. Nothing is uploaded anywhere.</p></div>
+</section>
+</main>
+<script src="seed.js"></script>
+<script src="billing-core.js"></script>
+<script src="summary-core.js"></script>
+<script src="parser.js"></script>
+<script src="mode.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
