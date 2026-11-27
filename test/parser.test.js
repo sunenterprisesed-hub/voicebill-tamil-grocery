@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const P = require('../public/parser.js');
+const P = require('../parser.js');
 const catalog = require('../server/catalog.seed.js');
 const run = (s) => P.parse(s, catalog).lines;
 const one = (s) => run(s)[0];
@@ -51,7 +51,7 @@ test('quantity with no item is a warning', () => { assert.ok(P.parse('rendu kilo
 test('empty input', () => { assert.deepEqual(run(''), []); });
 
 // ---- rupee amounts and spoken aliases (user phone test, Nov 14) ----
-const B = require('../public/billing-core.js');
+const B = require('../billing-core.js');
 const am = (s) => run(s).map((x) => [x.itemId, x.qty, x.amount === undefined ? null : x.amount, x.status]);
 test('"Karuveppilai 5 rubai" is Rs 5 worth of curry leaves, not 5 kg, and "rubai" is not an item', () => {
   const r = P.parse('Karuveppilai 5 rubai', catalog);
