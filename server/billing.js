@@ -1,2 +1,1 @@
-'use strict';
-module.exports = require('../public/billing-core.js');
+module.exports = require('../billing-core.js');
